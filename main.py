@@ -3,7 +3,6 @@ import random
 
 width, height = 600, 900
 ring_x = 150
-hole_radius = 30
 FPS = 60
 
 BLACK = (50, 50, 50)
@@ -14,15 +13,13 @@ WHITE = (245, 245, 245)
 
 class Course:
     def __init__(self):
-        #25の点で画面の線を表す
-        self.points = [[i * 20, height // 2, "BLACK"]for i in range(40)]
+        self.points = [[i * 20, height // 2, "BLACK"]for i in range(width//20 +2)]
         self.speed = 3
-        
         self.current_zone_color = "BLACK"
-        self.zone_remaining = 0 #あと何個この色を続けるか
+        self.zone_remaining = 0 #あと何個この色を続けるか,一旦初期値0
         
     def update(self):
-        #輪の位置を左から5個めの点の位置
+        #輪の位置にある線の色を確認してスピード変更
         idx = ring_x //20 
         current_segment = self.points[idx]
         if current_segment[2] == "BLUE":
@@ -36,7 +33,7 @@ class Course:
         for p in self.points:
             p[0] -= self.speed
         
-        #画面左端で消す、
+        #画面左端で消す
         if self.points[0][0] < -20:
             self.points.pop(0)
             last_x, last_y, last_type = self.points[-1]
@@ -68,18 +65,52 @@ class Course:
             p2 = self.points[i+1]
             color_map = {"BLACK": BLACK, "BLUE": BLUE, "GREEN": GREEN}
             color = color_map[p1[2]]
+            pygame.draw.line(screen, color, (p1[0], p1[1]), (p2[0], p2[1]), 8)  
+            pygame.draw.circle(screen, color, (int(p2[0]), int(p2[1])), 4)
 
-            #点を待つく塗りつぶす
-            pygame.draw.circle(screen, color, (int(p1[0]), int(p1[1])), 4)
-
-            # 線を描画
-            pygame.draw.line(screen, color, (p1[0], p1[1]), (p2[0], p2[1]), 8)
-            
-            # 最後の点にも円を描画
-            if i == len(self.points) - 2:
-                pygame.draw.circle(screen, color, (int(p2[0]), int(p2[1])), 4)
+class Doughnut:
+    def __init__(self):
+        self.x = ring_x
+        self.y = height//2
+        self.velocity = 0
+        self.gravity = 0.2#落ちてくる
+        self.jump_power = -3#跳ねあがり
+        
+        #あたり判定用サイズ
+        self.radius = 60 #外円半径
+        self.hole_radius = 25 #内円半径
+                
+        raw_img = pygame.image.load("doughnut.png").convert_alpha()
+        
+        # アスペクト比を維持してスケーリング
+        orig_w, orig_h = raw_img.get_size()
+        ratio = orig_w / orig_h
+        self.display_w = self.radius * 3.5
+        self.display_h = int(self.display_w / ratio)
+        self.image = pygame.transform.scale(raw_img, (self.display_w, self.display_h))
     
-
+    def update(self):
+        
+        self.velocity += self.gravity
+        self.y += self.velocity
+        
+        #跳ね返りの制限
+        if self.y <0:
+            self.y = 0
+            self.velocity =0
+        if self.y > height:
+            self.y = height
+            self.velocity = 0
+            
+    def jump(self):
+        self.velocity = self.jump_power
+        
+    def draw(self,screen):
+        draw_pos = (self.x - self.display_w // 2, int(self.y) - self.display_h // 2)
+        screen.blit(self.image, draw_pos)
+        
+        
+        
 class AppMain:
     def __init__(self):
         pygame.init()
@@ -87,6 +118,7 @@ class AppMain:
         pygame.display.set_caption("Don't touch the line!")
         self.clock = pygame.time.Clock()
         self.course = Course()
+        self.doughnut = Doughnut()
         
         
     def run(self):
@@ -94,17 +126,25 @@ class AppMain:
         
         while game_is_running:
             for event in pygame.event.get():
-                #ゲーム強制終了
+                #イベント管理
                 if event.type == pygame.QUIT:
                     game_is_running = False #画面右上の×ボタン
                 elif event.type == pygame.KEYDOWN:
                     if event.key == pygame.K_ESCAPE:#EscKey
                         game_is_running = False
+                    if event.key ==pygame.K_SPACE:#スペースでジャンプ
+                        self.doughnut.jump()
+                elif event.type == pygame.MOUSEBUTTONDOWN:#マウスでもジャンプ
+                    self.doughnut.jump()
+                    
+                
                 
             self.course.update()
+            self.doughnut.update()
             
             self.screen.fill(WHITE)
             self.course.draw(self.screen)
+            self.doughnut.draw(self.screen)
             
             pygame.display.flip()
             self.clock.tick(FPS)
@@ -115,5 +155,6 @@ class AppMain:
 if __name__ == "__main__":
     app = AppMain()
     app.run()
+        
         
         
