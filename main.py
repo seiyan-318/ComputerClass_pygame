@@ -72,13 +72,13 @@ class Course:
             #点を待つく塗りつぶす
             pygame.draw.circle(screen, color, (int(p1[0]), int(p1[1])), 4)
 
-            # 2. 線を描画
+            # 線を描画
             pygame.draw.line(screen, color, (p1[0], p1[1]), (p2[0], p2[1]), 8)
             
             # 最後の点にも円を描画
             if i == len(self.points) - 2:
                 pygame.draw.circle(screen, color, (int(p2[0]), int(p2[1])), 4)
-
+    
 
 class AppMain:
     def __init__(self):
