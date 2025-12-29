@@ -9,12 +9,14 @@ BLACK = (50, 50, 50)
 BLUE = (0, 0, 255)
 GREEN = (0, 200, 0)
 WHITE = (245, 245, 245)
+RED = (255, 0, 0)
+PINK = (100, 0, 0)
 
 
 class Course:
     def __init__(self):
         self.points = [[i * 20, height // 2, "BLACK"]for i in range(width//20 +2)]
-        self.speed = 3
+        self.speed = 3#流れる速さ
         self.current_zone_color = "BLACK"
         self.zone_remaining = 0 #あと何個この色を続けるか,一旦初期値0
         
@@ -105,9 +107,21 @@ class Doughnut:
     def jump(self):
         self.velocity = self.jump_power
         
+    def is_touching(self, points):
+        idx = ring_x // 20
+        if 0 <= idx < len (points):
+            target_p = points[idx]
+            distance = abs(self.y - target_p[1])
+            #穴の半径より離れていたら接触判定
+            if distance > self.hole_radius:
+                return True
+        return False
+
+    
     def draw(self,screen):
         draw_pos = (self.x - self.display_w // 2, int(self.y) - self.display_h // 2)
         screen.blit(self.image, draw_pos)
+        
         
         
         
@@ -117,8 +131,15 @@ class AppMain:
         self.screen = pygame.display.set_mode((width, height))
         pygame.display.set_caption("Don't touch the line!")
         self.clock = pygame.time.Clock()
+        self.font = pygame.font.SysFont(None, 80)
         self.course = Course()
         self.doughnut = Doughnut()
+        self.game_over = False
+    
+    def reset_game(self):
+        self.course = Course()
+        self.doughnut = Doughnut()
+        self.game_over = False
         
         
     def run(self):
@@ -134,18 +155,32 @@ class AppMain:
                         game_is_running = False
                     if event.key ==pygame.K_SPACE:#スペースでジャンプ
                         self.doughnut.jump()
+                    if event.key == pygame.K_r:
+                        self.reset_game()
                 elif event.type == pygame.MOUSEBUTTONDOWN:#マウスでもジャンプ
                     self.doughnut.jump()
                     
+            if self.game_over == False:
+                self.course.update()
+                self.doughnut.update()
                 
-                
-            self.course.update()
-            self.doughnut.update()
-            
+                if self.doughnut.is_touching(self.course.points):
+                    self.game_over = True
+                    
             self.screen.fill(WHITE)
             self.course.draw(self.screen)
             self.doughnut.draw(self.screen)
             
+            if self.game_over:
+                msg = self.font.render("GAME OVER", True, RED)
+                text_rect = msg.get_rect(center = (width//2, height//2))
+                self.screen.blit(msg, text_rect)
+            
+            # もう一回
+                retry_font = pygame.font.SysFont(None, 40)
+                retry_msg = retry_font.render("Press 'R' to Restart", True, BLACK)
+                retry_rect = retry_msg.get_rect(center = (width // 2, height // 2 + 80))
+                self.screen.blit(retry_msg, retry_rect)
             pygame.display.flip()
             self.clock.tick(FPS)
                 
