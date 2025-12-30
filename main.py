@@ -314,7 +314,7 @@ class AppMain:
             self.clock.tick(FPS)
                 
         pygame.quit()
-    
+
 
 if __name__ == "__main__":
     app = AppMain()
