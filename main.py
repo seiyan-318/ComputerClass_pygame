@@ -12,6 +12,7 @@ GREEN = (0, 200, 0)
 WHITE = (245, 245, 245)
 RED = (255, 0, 0)
 PINK = (231, 217, 217)
+GOLD = (183, 158,23)
 
 
 class Course:
@@ -75,6 +76,7 @@ class Course:
             pygame.draw.line(screen, color, (p1[0], p1[1]), (p2[0], p2[1]), 8)  
             pygame.draw.circle(screen, color, (int(p2[0]), int(p2[1])), 4)
 
+
 class Doughnut:
     def __init__(self):
         self.x = ring_x
@@ -130,7 +132,7 @@ class Doughnut:
         area_rect = (split_x, 0, self.display_w - split_x, self.display_h)
         screen.blit(self.image, (base_x + split_x, base_y), area_rect)
         
-        # -----デバッグ用(あたり範囲)-----
+        # -----デバッグ用(あたり判定の範囲)-----
         # pygame.draw.circle(screen, GREEN, (self.x, int(self.y)), self.hole_radius, 2)
         # pygame.draw.line(screen, BLUE, (self.x + self.split_offset, base_y), (self.x + self.split_offset, base_y + self.display_h), 2)
     
@@ -141,8 +143,6 @@ class Doughnut:
         base_y = int(self.y) - self.display_h // 2
         area_rect = (0, 0, split_x, self.display_h)
         screen.blit(self.image, (base_x, base_y), area_rect)
-
-
 
 
 class Score:
@@ -176,31 +176,52 @@ class Score:
         else:
             self.save_highscre()
                 
-            
     def reset(self):
         self.start_ticks = pygame.time.get_ticks()
         self.value = 0    
-        
             
     def draw(self, screen):
-        score_msg = self.font.render(f"SCORE: {self.value}", True, BLACK)
-        screen.blit(score_msg, (width -400, 30))
+        text_color = BLACK
+        if self.value >= self.high_score and self.value > 0:
+            text_color = GOLD
+        
+        #現在のスコア
+        label_font = self.font
+        label_msg = label_font.render("SCORE", True, BLACK)
+        screen.blit(label_msg, (250, 100))
+        score_msg = self.font.render(f" {self.value}", True, text_color)
+        screen.blit(score_msg, (290, 150))
+        #ベストスコア
         high_msg = self.font.render(f"BEST: {self.high_score}", True, (100, 100, 100))
-        screen.blit(high_msg, (30, 70))
-
-
+        screen.blit(high_msg, (30, 30))
 
 
 class Background:
     def __init__(self):
         self.color = list(PINK)  # 現在の背景色
         self.target_color = list(PINK) # 目標の背景色
-
-    def update(self,  zone_type):
-        # ゾーンの線の色に合わせて背景色も変える
-        if zone_type == "BLUE":
+        
+        
+        self.images = []
+        for f in ["deco1.png", "deco2.png", "deco3.png"]:
+            img = pygame.image.load(f).convert_alpha()
+            self.images.append(pygame.transform.scale(img, (100, 100)))
+                
+        self.objs = [[random.randint(0, width), random.randint(0, 300), random.randint(0, len(self.images)-1)] for _ in range(1)]    
+        
+    def move_objects(self, speed):
+        for obj in self.objs:
+            obj[0] -= speed
+            if obj[0] < -100: 
+                obj[0] = width + random.randint(0, 100)
+                obj[1] = random.randint(0, 150)
+                obj[2] = random.randint(0, len(self.images)-1)
+        
+        
+    def update_color(self, zone):
+        if zone == "BLUE":
             self.target_color = [230, 230, 255] #薄い青
-        elif zone_type == "GREEN":
+        elif zone == "GREEN":
             self.target_color = [230, 255, 230] #薄い緑
         else:
             self.target_color = [231, 217, 217] #薄いピンク
@@ -210,11 +231,20 @@ class Background:
                 self.color[i] += 1
             if self.color[i] > self.target_color[i]:
                 self.color[i] -= 1
-                
+    
+    def update(self, speed, zone):
+        self.update_color(zone)
+        self.move_objects(speed)
+
     def draw(self, screen):
         screen.fill(tuple(self.color))
-
         
+        for obj in self.objs:
+            # obj[0] は x座標, obj[1] は y座標, obj[2] は画像の番号
+            img = self.images[obj[2]]
+            screen.blit(img, (obj[0], obj[1]))
+
+
 class AppMain:
     def __init__(self):
         pygame.init()
@@ -260,7 +290,7 @@ class AppMain:
                 self.course.update()
                 self.doughnut.update()
                 self.score.update(self.game_over)
-                self.background.update(current_zone)
+                self.background.update(self.course.speed,current_zone)
 
                 if self.doughnut.is_touching(self.course.points):
                     self.game_over = True
