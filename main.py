@@ -1,5 +1,6 @@
 import pygame
 import random
+import os
 
 width, height = 600, 900
 ring_x = 150
@@ -10,7 +11,7 @@ BLUE = (0, 0, 255)
 GREEN = (0, 200, 0)
 WHITE = (245, 245, 245)
 RED = (255, 0, 0)
-PINK = (100, 0, 0)
+PINK = (231, 217, 217)
 
 
 class Course:
@@ -19,18 +20,22 @@ class Course:
         self.speed = 3#流れる速さ
         self.current_zone_color = "BLACK"
         self.zone_remaining = 0 #あと何個この色を続けるか,一旦初期値0
-        
+    
+    def get_zone_now(self, x):
+        idx = int((x - self.points[0][0]) // 20)
+        if 0 <= idx < len(self.points):
+            return self.points[idx][2]
+        return "BLACK"
+    
     def update(self):
-        #輪の位置にある線の色を確認してスピード変更
-        idx = ring_x //20 
-        current_segment = self.points[idx]
-        if current_segment[2] == "BLUE":
+        zone = self.get_zone_now(ring_x)
+        if zone == "BLUE":
             self.speed = 2
-        elif current_segment[2] == "GREEN":
+        elif zone == "GREEN":
             self.speed = 4
         else:
             self.speed = 3
-        
+            
         #全部の点を←に動かす
         for p in self.points:
             p[0] -= self.speed
@@ -75,19 +80,18 @@ class Doughnut:
         self.x = ring_x
         self.y = height//2
         self.velocity = 0
-        self.gravity = 0.2#落ちてくる
+        self.gravity = 0.25#落ちてくる
         self.jump_power = -3#跳ねあがり
+        self.split_offset = 10
         
         #あたり判定用サイズ
-        self.radius = 60 #外円半径
-        self.hole_radius = 25 #内円半径
-                
-        raw_img = pygame.image.load("doughnut.png").convert_alpha()
+        self.radius = 120#外円半径
+        self.hole_radius = 70 #内円半径
         
-        # アスペクト比を維持してスケーリング
-        orig_w, orig_h = raw_img.get_size()
+        raw_img = pygame.image.load("doughnut.png").convert_alpha()
+        orig_w, orig_h = raw_img.get_size()# アスペクト比を維持してスケーリング
         ratio = orig_w / orig_h
-        self.display_w = self.radius * 3.5
+        self.display_w = 200
         self.display_h = int(self.display_w / ratio)
         self.image = pygame.transform.scale(raw_img, (self.display_w, self.display_h))
     
@@ -106,24 +110,110 @@ class Doughnut:
             
     def jump(self):
         self.velocity = self.jump_power
-        
+
     def is_touching(self, points):
-        idx = ring_x // 20
-        if 0 <= idx < len (points):
+        check_x = self.x + self.split_offset 
+        idx = int((check_x - points[0][0]) // 20)
+        
+        if 0 <= idx < len(points):
             target_p = points[idx]
             distance = abs(self.y - target_p[1])
-            #穴の半径より離れていたら接触判定
             if distance > self.hole_radius:
                 return True
         return False
-
+        
+    def draw_back(self, screen):
+        #doughnutの右半分だけ(線の後ろに配置)
+        split_x = self.display_w // 2 + self.split_offset
+        base_x = self.x - self.display_w // 2
+        base_y = int(self.y) - self.display_h // 2
+        area_rect = (split_x, 0, self.display_w - split_x, self.display_h)
+        screen.blit(self.image, (base_x + split_x, base_y), area_rect)
+        
+        # -----デバッグ用(あたり範囲)-----
+        # pygame.draw.circle(screen, GREEN, (self.x, int(self.y)), self.hole_radius, 2)
+        # pygame.draw.line(screen, BLUE, (self.x + self.split_offset, base_y), (self.x + self.split_offset, base_y + self.display_h), 2)
     
-    def draw(self,screen):
-        draw_pos = (self.x - self.display_w // 2, int(self.y) - self.display_h // 2)
-        screen.blit(self.image, draw_pos)
+    def draw_front(self, screen):
+        #doughnutの左半分(線の手前に表示)
+        split_x = self.display_w // 2 + self.split_offset
+        base_x = self.x - self.display_w // 2
+        base_y = int(self.y) - self.display_h // 2
+        area_rect = (0, 0, split_x, self.display_h)
+        screen.blit(self.image, (base_x, base_y), area_rect)
+
+
+
+
+class Score:
+    def __init__(self):
+        self.font = pygame.font.SysFont(None, 50)
+        self.start_ticks = pygame.time.get_ticks()
+        self.high_score = self.load_highscore()
+        self.value = 0 #スコア保存用
         
+    def load_highscore(self):
+        if os.path.exists("highscore.txt"):
+            with open("highscore.txt", "r") as f:
+                try:
+                    return int(f.read())
+                except:
+                    return 0
+        return 0
+    
+    def save_highscre(self):
+        with open("highscore.txt", "w") as f:
+            f.write(str(self.high_score))
+            
+    def update(self, is_game_over):
+        if is_game_over == False:
+            now = pygame.time.get_ticks()
+            self.value = (now - self.start_ticks)//1000
+            
+            if self.value > self.high_score:
+                self.high_score = self.value
+                
+        else:
+            self.save_highscre()
+                
+            
+    def reset(self):
+        self.start_ticks = pygame.time.get_ticks()
+        self.value = 0    
         
-        
+            
+    def draw(self, screen):
+        score_msg = self.font.render(f"SCORE: {self.value}", True, BLACK)
+        screen.blit(score_msg, (width -400, 30))
+        high_msg = self.font.render(f"BEST: {self.high_score}", True, (100, 100, 100))
+        screen.blit(high_msg, (30, 70))
+
+
+
+
+class Background:
+    def __init__(self):
+        self.color = list(PINK)  # 現在の背景色
+        self.target_color = list(PINK) # 目標の背景色
+
+    def update(self,  zone_type):
+        # ゾーンの線の色に合わせて背景色も変える
+        if zone_type == "BLUE":
+            self.target_color = [230, 230, 255] #薄い青
+        elif zone_type == "GREEN":
+            self.target_color = [230, 255, 230] #薄い緑
+        else:
+            self.target_color = [231, 217, 217] #薄いピンク
+
+        for i in range(3):
+            if self.color[i] < self.target_color[i]:
+                self.color[i] += 1
+            if self.color[i] > self.target_color[i]:
+                self.color[i] -= 1
+                
+    def draw(self, screen):
+        screen.fill(tuple(self.color))
+
         
 class AppMain:
     def __init__(self):
@@ -134,11 +224,16 @@ class AppMain:
         self.font = pygame.font.SysFont(None, 80)
         self.course = Course()
         self.doughnut = Doughnut()
+        self.score = Score() 
+        self.background = Background()
         self.game_over = False
+        
     
     def reset_game(self):
         self.course = Course()
         self.doughnut = Doughnut()
+        self.score.reset()
+        self.background = Background()
         self.game_over = False
         
         
@@ -161,22 +256,26 @@ class AppMain:
                     self.doughnut.jump()
                     
             if self.game_over == False:
+                current_zone = self.course.get_zone_now(self.doughnut.x + self.doughnut.split_offset)
                 self.course.update()
                 self.doughnut.update()
-                
+                self.score.update(self.game_over)
+                self.background.update(current_zone)
+
                 if self.doughnut.is_touching(self.course.points):
                     self.game_over = True
+                    self.score.update(self.game_over) #スコア保存アップデート
                     
-            self.screen.fill(WHITE)
+            self.background.draw(self.screen)
+            self.doughnut.draw_back(self.screen)
             self.course.draw(self.screen)
-            self.doughnut.draw(self.screen)
-            
+            self.doughnut.draw_front(self.screen)
+            self.score.draw(self.screen)
+
             if self.game_over:
                 msg = self.font.render("GAME OVER", True, RED)
                 text_rect = msg.get_rect(center = (width//2, height//2))
-                self.screen.blit(msg, text_rect)
-            
-            # もう一回
+                self.screen.blit(msg, text_rect)       
                 retry_font = pygame.font.SysFont(None, 40)
                 retry_msg = retry_font.render("Press 'R' to Restart", True, BLACK)
                 retry_rect = retry_msg.get_rect(center = (width // 2, height // 2 + 80))
@@ -190,6 +289,3 @@ class AppMain:
 if __name__ == "__main__":
     app = AppMain()
     app.run()
-        
-        
-        
